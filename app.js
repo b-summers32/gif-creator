@@ -1,7 +1,6 @@
-// FIX: Import FFmpeg and utilities directly from the ESM build on unpkg
-// This matches the <script type="module"> in your index.html
-import { FFmpeg } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/esm/index.js';
-import { toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
+// FIX: Switched to jsDelivr CDN which has more reliable CORS headers than unpkg
+import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.7/dist/esm/index.js';
+import { toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js';
 
 // Global instance for FFmpeg
 let ffmpeg;
@@ -24,11 +23,10 @@ const initializeFFmpeg = async () => {
              console.log('[FFmpeg Log]:', message);
         });
 
-        // Define the base URL for the core files
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.7/dist/esm';
+        // FIX: Use jsDelivr for the core files as well to prevent "Failed to fetch" errors
+        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.7/dist/esm';
 
-        // Load the core FFmpeg files using toBlobURL to prevent loading errors
-        // We use toBlobURL to bypass some strict browser security restrictions on loading scripts
+        // Load the core FFmpeg files using toBlobURL
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -82,7 +80,6 @@ const convertToGif = async () => {
         await ffmpeg.writeFile(inputFile, new Uint8Array(data));
 
         // --- 3. Run Conversion Command ---
-        // -vf fps=15,scale=320:-1 : Reduce FPS to 15 and width to 320px for WebAssembly performance
         statusDiv.textContent = 'Converting video (this may take a moment)...';
         
         const command = [
