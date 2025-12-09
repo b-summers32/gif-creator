@@ -24,8 +24,8 @@
         </div>
     </div>
 
-    <!-- Import FFmpeg.wasm library (essential for client-side video processing) -->
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/ffmpeg.min.js"></script>
+    <!-- FIX: Import the UMD build of FFmpeg.wasm for usage in script tags -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/umd/ffmpeg.min.js"></script>
     
     <!-- Link to our application logic -->
     <script src="app.js"></script>

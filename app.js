@@ -13,9 +13,9 @@ const initializeFFmpeg = async () => {
     try {
         statusDiv.textContent = 'Initializing FFmpeg... (This may take a few seconds)';
         
-        // FIX: The UMD build of @ffmpeg/ffmpeg 0.12.x exposes a global object named 'FFmpegWASM'.
-        // We must destructure the FFmpeg class from it.
-        const { FFmpeg } = FFmpegWASM;
+        // FIX: The UMD build of @ffmpeg/ffmpeg 0.12.x exposes a global object named 'FFmpeg'.
+        // Inside that object is the 'FFmpeg' class we need.
+        const { FFmpeg } = window.FFmpeg;
         
         ffmpeg = new FFmpeg();
 
