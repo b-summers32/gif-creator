@@ -13,8 +13,10 @@ const initializeFFmpeg = async () => {
     try {
         statusDiv.textContent = 'Initializing FFmpeg... (This may take a few seconds)';
         
-        // FIX: The CDN loads the FFmpeg class directly into the global scope,
-        // so we must use 'new FFmpeg()' instead of 'new FFmpegWASM.FFmpeg()'.
+        // FIX: The UMD build of @ffmpeg/ffmpeg 0.12.x exposes a global object named 'FFmpegWASM'.
+        // We must destructure the FFmpeg class from it.
+        const { FFmpeg } = FFmpegWASM;
+        
         ffmpeg = new FFmpeg();
 
         // Optional: Listen for log messages from FFmpeg for debugging
@@ -22,16 +24,16 @@ const initializeFFmpeg = async () => {
              console.log('[FFmpeg Log]:', message);
         });
 
-        // Load the core FFmpeg files. This is when the main program files are downloaded.
+        // Load the core FFmpeg files. 
+        // We explicitly provide both coreURL and wasmURL to ensure they are found correctly on the CDN.
         await ffmpeg.load({
             coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.7/dist/ffmpeg-core.js',
+            wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.7/dist/ffmpeg-core.wasm'
         });
         
         statusDiv.textContent = 'Ready! Upload an MP4 file.';
         
     } catch (error) {
-        // Now that we fixed the reference error, this catch block is more likely to
-        // catch network or core file loading issues.
         statusDiv.textContent = `Error during initialization: ${error.message}. Please check console.`;
         console.error("Initialization error:", error);
     }
@@ -60,67 +62,62 @@ const convertToGif = async () => {
 
     // --- 1. Load File Data ---
     statusDiv.textContent = 'Reading video file...';
-    // Read the file data into an ArrayBuffer
-    const data = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsArrayBuffer(file);
-    });
-    
-    const inputFile = 'input.mp4';
-    const outputFile = 'output.gif';
-    
-    // --- 2. Write to FFmpeg Virtual File System (VFS) ---
-    statusDiv.textContent = 'Writing file to memory...';
-    // Write the video file data to FFmpeg's in-memory file system
-    await ffmpeg.writeFile(inputFile, new Uint8Array(data));
-
-    // --- 3. Run Conversion Command ---
-    // Command breakdown:
-    // -i input.mp4: specifies the input file
-    // -vf fps=15,scale=320:-1: applies video filters (scale to 320px width, auto height, 15 frames per second)
-    // output.gif: specifies the output file name and format
-    statusDiv.textContent = 'Converting video (lower FPS and resolution used to keep file size small)...';
-    
-    const command = [
-        '-i', inputFile,
-        '-vf', 'fps=15,scale=320:-1', 
-        outputFile
-    ];
-    
     try {
+        // Read the file data into an ArrayBuffer
+        const data = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+        
+        const inputFile = 'input.mp4';
+        const outputFile = 'output.gif';
+        
+        // --- 2. Write to FFmpeg Virtual File System (VFS) ---
+        statusDiv.textContent = 'Writing file to memory...';
+        // Write the video file data to FFmpeg's in-memory file system
+        await ffmpeg.writeFile(inputFile, new Uint8Array(data));
+
+        // --- 3. Run Conversion Command ---
+        statusDiv.textContent = 'Converting video (lower FPS and resolution used to keep file size small)...';
+        
+        const command = [
+            '-i', inputFile,
+            '-vf', 'fps=15,scale=320:-1', 
+            outputFile
+        ];
+        
         await ffmpeg.exec(command);
+        
+        // --- 4. Read Output GIF ---
+        statusDiv.textContent = 'Reading output GIF...';
+        // Read the converted GIF data from the VFS
+        const outputData = await ffmpeg.readFile(outputFile);
+        
+        // --- 5. Create Download Link and Display ---
+        const blob = new Blob([outputData.buffer], { type: 'image/gif' });
+        const url = URL.createObjectURL(blob);
+        
+        // Display the GIF preview
+        outputArea.innerHTML += `<img src="${url}" alt="Converted GIF" class="converted-gif">`;
+        
+        // Create the download link
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.download = `converted-${file.name.split('.')[0] || 'video'}.gif`;
+        downloadLink.textContent = 'Click to Download GIF';
+        downloadLink.className = 'download-link';
+        outputArea.appendChild(downloadLink);
+
+        statusDiv.textContent = 'Conversion successful! Check below to download.';
     } catch (e) {
         statusDiv.textContent = `Conversion Failed! Error: ${e.message}`;
+        console.error(e);
+    } finally {
         convertBtn.disabled = false;
         convertBtn.textContent = 'Convert to GIF';
-        return;
     }
-    
-    // --- 4. Read Output GIF ---
-    statusDiv.textContent = 'Reading output GIF...';
-    // Read the converted GIF data from the VFS
-    const outputData = await ffmpeg.readFile(outputFile);
-    
-    // --- 5. Create Download Link and Display ---
-    const blob = new Blob([outputData.buffer], { type: 'image/gif' });
-    const url = URL.createObjectURL(blob);
-    
-    // Display the GIF preview
-    outputArea.innerHTML += `<img src="${url}" alt="Converted GIF" class="converted-gif">`;
-    
-    // Create the download link
-    const downloadLink = document.createElement('a');
-    downloadLink.href = url;
-    downloadLink.download = `converted-${file.name.split('.')[0] || 'video'}.gif`;
-    downloadLink.textContent = 'Click to Download GIF';
-    downloadLink.className = 'download-link';
-    outputArea.appendChild(downloadLink);
-
-    statusDiv.textContent = 'Conversion successful! Check below to download.';
-    convertBtn.disabled = false;
-    convertBtn.textContent = 'Convert to GIF';
 };
 
 // --- Event Listeners ---
