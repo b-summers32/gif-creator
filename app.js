@@ -1,9 +1,5 @@
-// FIX: Switched to jsDelivr CDN which has more reliable CORS headers than unpkg
-import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.7/dist/esm/index.js';
-import { toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js';
-
-// Global instance for FFmpeg
-let ffmpeg;
+// Destructure the FFmpeg global provided by the script tag in index.html
+const { createFFmpeg, fetchFile } = FFmpeg;
 
 // Select HTML elements
 const videoInput = document.getElementById('video-input');
@@ -11,44 +7,39 @@ const convertBtn = document.getElementById('convert-btn');
 const statusDiv = document.getElementById('status');
 const outputArea = document.getElementById('output-area');
 
+// Global instance
+let ffmpeg = null;
+
 // --- Initialization Function ---
 const initializeFFmpeg = async () => {
     try {
         statusDiv.textContent = 'Initializing FFmpeg... (This may take a few seconds)';
         
-        ffmpeg = new FFmpeg();
-
-        // Listen for log messages
-        ffmpeg.on('log', ({ message }) => {
-             console.log('[FFmpeg Log]:', message);
+        // FIX: Initialize using the Single-Threaded core (core-st).
+        // This version does NOT require special server headers (COOP/COEP) and works on any hosting.
+        ffmpeg = createFFmpeg({ 
+            log: true,
+            corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js'
         });
 
-        // FIX: Use jsDelivr for the core files as well to prevent "Failed to fetch" errors
-        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.7/dist/esm';
-
-        // Load the core FFmpeg files using toBlobURL
-        await ffmpeg.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
+        await ffmpeg.load();
         
         statusDiv.textContent = 'Ready! Upload an MP4 file.';
         
-        // Re-check input in case user added file while loading
-        if (videoInput && videoInput.files.length > 0) {
+        if (videoInput.files.length > 0) {
             convertBtn.disabled = false;
         }
 
     } catch (error) {
-        statusDiv.textContent = `Error during initialization: ${error.message}. Please check console.`;
-        console.error("Initialization error:", error);
+        statusDiv.textContent = `Initialization Failed: ${error.message}`;
+        console.error("Init Error:", error);
     }
 };
 
 // --- Conversion Function ---
 const convertToGif = async () => {
-    if (!ffmpeg) {
-        statusDiv.textContent = 'FFmpeg is still initializing. Please wait.';
+    if (!ffmpeg || !ffmpeg.isLoaded()) {
+        statusDiv.textContent = 'FFmpeg is not ready. Try refreshing the page.';
         return;
     }
 
@@ -62,41 +53,28 @@ const convertToGif = async () => {
     convertBtn.disabled = true;
     convertBtn.textContent = 'Converting...';
 
-    // --- 1. Load File Data ---
+    // --- 1. Write File ---
     statusDiv.textContent = 'Reading video file...';
     try {
-        const data = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsArrayBuffer(file);
-        });
-        
         const inputFile = 'input.mp4';
         const outputFile = 'output.gif';
         
-        // --- 2. Write to FFmpeg VFS ---
-        statusDiv.textContent = 'Writing file to memory...';
-        await ffmpeg.writeFile(inputFile, new Uint8Array(data));
+        // Write the file to memory
+        ffmpeg.FS('writeFile', inputFile, await fetchFile(file));
 
-        // --- 3. Run Conversion Command ---
-        statusDiv.textContent = 'Converting video (this may take a moment)...';
+        // --- 2. Run Conversion ---
+        statusDiv.textContent = 'Converting... (This is slower in single-threaded mode, please be patient)';
         
-        const command = [
-            '-i', inputFile,
-            '-vf', 'fps=15,scale=320:-1', 
-            '-f', 'gif',
-            outputFile
-        ];
+        // Run FFmpeg command
+        // -vf fps=10,scale=320:-1 : Lower FPS/Resolution is recommended for single-threaded performance
+        await ffmpeg.run('-i', inputFile, '-vf', 'fps=10,scale=320:-1', '-f', 'gif', outputFile);
         
-        await ffmpeg.exec(command);
-        
-        // --- 4. Read Output GIF ---
+        // --- 3. Read Output ---
         statusDiv.textContent = 'Reading output GIF...';
-        const outputData = await ffmpeg.readFile(outputFile);
+        const data = ffmpeg.FS('readFile', outputFile);
         
-        // --- 5. Display Result ---
-        const blob = new Blob([outputData.buffer], { type: 'image/gif' });
+        // --- 4. Display ---
+        const blob = new Blob([data.buffer], { type: 'image/gif' });
         const url = URL.createObjectURL(blob);
         
         outputArea.innerHTML += `<img src="${url}" alt="Converted GIF" class="converted-gif">`;
@@ -108,9 +86,9 @@ const convertToGif = async () => {
         downloadLink.className = 'download-link';
         outputArea.appendChild(downloadLink);
 
-        statusDiv.textContent = 'Conversion successful! Check below to download.';
+        statusDiv.textContent = 'Conversion successful!';
     } catch (e) {
-        statusDiv.textContent = `Conversion Failed! Error: ${e.message}`;
+        statusDiv.textContent = `Conversion Failed: ${e.message}`;
         console.error(e);
     } finally {
         convertBtn.disabled = false;
@@ -119,18 +97,13 @@ const convertToGif = async () => {
 };
 
 // --- Event Listeners ---
-if (videoInput) {
-    videoInput.addEventListener('change', () => {
-        // Only enable if ffmpeg is loaded
-        if (videoInput.files.length > 0 && statusDiv.textContent.includes('Ready')) {
-            convertBtn.disabled = false;
-        }
-    });
-}
+videoInput.addEventListener('change', () => {
+    if (videoInput.files.length > 0 && statusDiv.textContent.includes('Ready')) {
+        convertBtn.disabled = false;
+    }
+});
 
-if (convertBtn) {
-    convertBtn.addEventListener('click', convertToGif);
-}
+convertBtn.addEventListener('click', convertToGif);
 
-// Start initialization
+// Start
 initializeFFmpeg();

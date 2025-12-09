@@ -24,9 +24,11 @@
         </div>
     </div>
 
-    <!-- FIX: Use type="module" so we can import libraries directly in app.js -->
-    <!-- We removed the separate script tags for ffmpeg/util to avoid global variable errors -->
-    <script type="module" src="app.js"></script>
+    <!-- FIX: Use FFmpeg v0.11.x which is easier to configure for single-threading -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    
+    <!-- Link to our application logic -->
+    <script src="app.js"></script>
 
 </body>
 </html>
