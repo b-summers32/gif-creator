@@ -13,8 +13,9 @@ const initializeFFmpeg = async () => {
     try {
         statusDiv.textContent = 'Initializing FFmpeg... (This may take a few seconds)';
         
-        // Create the FFmpeg instance
-        ffmpeg = new FFmpegWASM.FFmpeg();
+        // FIX: The CDN loads the FFmpeg class directly into the global scope,
+        // so we must use 'new FFmpeg()' instead of 'new FFmpegWASM.FFmpeg()'.
+        ffmpeg = new FFmpeg();
 
         // Optional: Listen for log messages from FFmpeg for debugging
         ffmpeg.on('log', ({ message }) => {
@@ -29,6 +30,8 @@ const initializeFFmpeg = async () => {
         statusDiv.textContent = 'Ready! Upload an MP4 file.';
         
     } catch (error) {
+        // Now that we fixed the reference error, this catch block is more likely to
+        // catch network or core file loading issues.
         statusDiv.textContent = `Error during initialization: ${error.message}. Please check console.`;
         console.error("Initialization error:", error);
     }
