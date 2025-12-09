@@ -1,3 +1,8 @@
+// FIX: Import FFmpeg and utilities directly from the ESM build on unpkg
+// This matches the <script type="module"> in your index.html
+import { FFmpeg } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/esm/index.js';
+import { toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
+
 // Global instance for FFmpeg
 let ffmpeg;
 
@@ -8,31 +13,34 @@ const statusDiv = document.getElementById('status');
 const outputArea = document.getElementById('output-area');
 
 // --- Initialization Function ---
-// Sets up the FFmpeg environment using WebAssembly.
 const initializeFFmpeg = async () => {
     try {
         statusDiv.textContent = 'Initializing FFmpeg... (This may take a few seconds)';
         
-        // FIX: The UMD build of @ffmpeg/ffmpeg 0.12.x exposes a global object named 'FFmpeg'.
-        // Inside that object is the 'FFmpeg' class we need.
-        const { FFmpeg } = window.FFmpeg;
-        
         ffmpeg = new FFmpeg();
 
-        // Optional: Listen for log messages from FFmpeg for debugging
+        // Listen for log messages
         ffmpeg.on('log', ({ message }) => {
              console.log('[FFmpeg Log]:', message);
         });
 
-        // Load the core FFmpeg files. 
-        // We explicitly provide both coreURL and wasmURL to ensure they are found correctly on the CDN.
+        // Define the base URL for the core files
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.7/dist/esm';
+
+        // Load the core FFmpeg files using toBlobURL to prevent loading errors
+        // We use toBlobURL to bypass some strict browser security restrictions on loading scripts
         await ffmpeg.load({
-            coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.7/dist/ffmpeg-core.js',
-            wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.7/dist/ffmpeg-core.wasm'
+            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
         });
         
         statusDiv.textContent = 'Ready! Upload an MP4 file.';
         
+        // Re-check input in case user added file while loading
+        if (videoInput && videoInput.files.length > 0) {
+            convertBtn.disabled = false;
+        }
+
     } catch (error) {
         statusDiv.textContent = `Error during initialization: ${error.message}. Please check console.`;
         console.error("Initialization error:", error);
@@ -41,29 +49,24 @@ const initializeFFmpeg = async () => {
 
 // --- Conversion Function ---
 const convertToGif = async () => {
-    // Guard clause to prevent running without initialization
     if (!ffmpeg) {
         statusDiv.textContent = 'FFmpeg is still initializing. Please wait.';
         return;
     }
 
-    // Clear previous output
     outputArea.innerHTML = '';
-    
     const file = videoInput.files[0];
     if (!file) {
         statusDiv.textContent = 'Please select an MP4 file first.';
         return;
     }
     
-    // Disable button and start progress
     convertBtn.disabled = true;
     convertBtn.textContent = 'Converting...';
 
     // --- 1. Load File Data ---
     statusDiv.textContent = 'Reading video file...';
     try {
-        // Read the file data into an ArrayBuffer
         const data = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
@@ -74,17 +77,18 @@ const convertToGif = async () => {
         const inputFile = 'input.mp4';
         const outputFile = 'output.gif';
         
-        // --- 2. Write to FFmpeg Virtual File System (VFS) ---
+        // --- 2. Write to FFmpeg VFS ---
         statusDiv.textContent = 'Writing file to memory...';
-        // Write the video file data to FFmpeg's in-memory file system
         await ffmpeg.writeFile(inputFile, new Uint8Array(data));
 
         // --- 3. Run Conversion Command ---
-        statusDiv.textContent = 'Converting video (lower FPS and resolution used to keep file size small)...';
+        // -vf fps=15,scale=320:-1 : Reduce FPS to 15 and width to 320px for WebAssembly performance
+        statusDiv.textContent = 'Converting video (this may take a moment)...';
         
         const command = [
             '-i', inputFile,
             '-vf', 'fps=15,scale=320:-1', 
+            '-f', 'gif',
             outputFile
         ];
         
@@ -92,17 +96,14 @@ const convertToGif = async () => {
         
         // --- 4. Read Output GIF ---
         statusDiv.textContent = 'Reading output GIF...';
-        // Read the converted GIF data from the VFS
         const outputData = await ffmpeg.readFile(outputFile);
         
-        // --- 5. Create Download Link and Display ---
+        // --- 5. Display Result ---
         const blob = new Blob([outputData.buffer], { type: 'image/gif' });
         const url = URL.createObjectURL(blob);
         
-        // Display the GIF preview
         outputArea.innerHTML += `<img src="${url}" alt="Converted GIF" class="converted-gif">`;
         
-        // Create the download link
         const downloadLink = document.createElement('a');
         downloadLink.href = url;
         downloadLink.download = `converted-${file.name.split('.')[0] || 'video'}.gif`;
@@ -121,17 +122,18 @@ const convertToGif = async () => {
 };
 
 // --- Event Listeners ---
+if (videoInput) {
+    videoInput.addEventListener('change', () => {
+        // Only enable if ffmpeg is loaded
+        if (videoInput.files.length > 0 && statusDiv.textContent.includes('Ready')) {
+            convertBtn.disabled = false;
+        }
+    });
+}
 
-// Enable the convert button when a file is selected
-videoInput.addEventListener('change', () => {
-    if (videoInput.files.length > 0) {
-        convertBtn.disabled = false;
-    } else {
-        convertBtn.disabled = true;
-    }
-});
+if (convertBtn) {
+    convertBtn.addEventListener('click', convertToGif);
+}
 
-convertBtn.addEventListener('click', convertToGif);
-
-// Start the application by initializing FFmpeg
+// Start initialization
 initializeFFmpeg();
