@@ -15,11 +15,13 @@ const initializeFFmpeg = async () => {
     try {
         statusDiv.textContent = 'Initializing FFmpeg... (This may take a few seconds)';
         
-        // FIX: Initialize using the Single-Threaded core (core-st).
-        // This version does NOT require special server headers (COOP/COEP) and works on any hosting.
+        // FIX: Added mainName: 'main'
+        // This tells the wrapper to use the single-threaded entry point ('main') 
+        // instead of the multi-threaded default ('proxy_main').
         ffmpeg = createFFmpeg({ 
             log: true,
-            corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js'
+            corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
+            mainName: 'main' 
         });
 
         await ffmpeg.load();
