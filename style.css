@@ -1,0 +1,107 @@
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #eef2f5;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+}
+
+h1 {
+    color: #3b82f6; /* Blue 500 */
+    margin-bottom: 10px;
+    font-size: 1.8rem;
+}
+
+p {
+    color: #6b7280; /* Gray 500 */
+    margin-bottom: 25px;
+}
+
+input[type="file"] {
+    display: block;
+    width: 100%;
+    padding: 10px 0;
+    margin: 15px 0;
+    border: 1px solid #d1d5db; /* Gray 300 */
+    border-radius: 8px;
+    background-color: #f9fafb; /* Gray 50 */
+    cursor: pointer;
+}
+
+button {
+    background-color: #10b981; /* Emerald 500 */
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    margin-top: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: background-color 0.3s, opacity 0.3s;
+    width: 100%;
+    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2);
+}
+
+button:hover:not(:disabled) {
+    background-color: #059669; /* Emerald 600 */
+}
+
+button:disabled {
+    background-color: #9ca3af; /* Gray 400 */
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
+#status {
+    margin: 30px 0;
+    padding: 15px;
+    border: 1px solid #60a5fa; /* Blue 400 */
+    background-color: #eff6ff; /* Blue 50 */
+    border-radius: 8px;
+    font-weight: 500;
+    color: #1e40af; /* Blue 800 */
+}
+
+#output-area {
+    margin-top: 25px;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 25px;
+}
+
+.converted-gif {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    margin-bottom: 15px;
+}
+
+.download-link {
+    display: inline-block;
+    background-color: #3b82f6; /* Blue 500 */
+    color: white;
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: background-color 0.3s;
+}
+
+.download-link:hover {
+    background-color: #2563eb; /* Blue 600 */
+}

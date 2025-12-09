@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP4 to GIF Converter</title>
+    <!-- Link to the CSS file for styling -->
+    <link rel="stylesheet" href="style.css"> 
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎞️ MP4 to GIF Converter</h1>
+        <p>This tool uses FFmpeg running in your browser (via WebAssembly) to convert MP4 files to animated GIFs without uploading data to a server.</p>
+
+        <input type="file" id="video-input" accept="video/mp4">
+        
+        <button id="convert-btn" disabled>Convert to GIF</button>
+        
+        <div id="status">Initializing...</div>
+        
+        <div id="output-area">
+            <!-- Converted GIF and download link will appear here -->
+        </div>
+    </div>
+
+    <!-- Import FFmpeg.wasm library (essential for client-side video processing) -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.7/dist/ffmpeg.min.js"></script>
+    
+    <!-- Link to our application logic -->
+    <script src="app.js"></script>
+
+</body>
+</html>
