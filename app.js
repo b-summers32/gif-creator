@@ -65,11 +65,20 @@ const convertToGif = async () => {
         ffmpeg.FS('writeFile', inputFile, await fetchFile(file));
 
         // --- 2. Run Conversion ---
-        statusDiv.textContent = 'Converting... (This is slower in single-threaded mode, please be patient)';
+        statusDiv.textContent = 'Converting... (High Quality mode: Generating palette, this takes longer)';
         
-        // Run FFmpeg command
-        // -vf fps=10,scale=320:-1 : Lower FPS/Resolution is recommended for single-threaded performance
-        await ffmpeg.run('-i', inputFile, '-vf', 'fps=10,scale=320:-1', '-f', 'gif', outputFile);
+        // Run FFmpeg command with Palette Generation
+        // Breakdown:
+        // fps=15,scale=480:-1:flags=lanczos : Set FPS to 15, Width to 480px, use high-quality scaling
+        // split[s0][s1] : Split the video stream into two identical streams
+        // [s0]palettegen[p] : Use the first stream to generate a custom color palette [p]
+        // [s1][p]paletteuse : Use the second stream and the palette [p] to render the final GIF
+        await ffmpeg.run(
+            '-i', inputFile, 
+            '-filter_complex', 'fps=15,scale=480:-1:flags=lanczos[x];[x]split[x1][x2];[x1]palettegen[p];[x2][p]paletteuse', 
+            '-f', 'gif', 
+            outputFile
+        );
         
         // --- 3. Read Output ---
         statusDiv.textContent = 'Reading output GIF...';
