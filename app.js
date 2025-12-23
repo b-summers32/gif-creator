@@ -161,7 +161,13 @@ const handleHeicToPng = async () => {
         setLoading(false);
     } catch (e) {
         setLoading(false);
-        setStatus(`Error: ${e.message}`, 'error');
+        
+        // Handle specific HEIC library errors
+        if (e.message && e.message.includes('ERR_LIBHEIF')) {
+            setStatus('Error: Unsupported HEIC format. This usually happens with live photos or highly compressed HEIC files.', 'error');
+        } else {
+            setStatus(`Error: ${e.message}`, 'error');
+        }
     }
 };
 
