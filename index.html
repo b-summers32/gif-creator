@@ -3,31 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GIF Buddy</title>
+    <title>Media Buddy</title>
     <!-- Link to the CSS file for styling -->
     <link rel="stylesheet" href="style.css"> 
 </head>
 <body>
 
     <div class="container">
-        <h1>🎞️ GIF Buddy</h1>
-        <p>This tool uses FFmpeg running in your browser (via WebAssembly) to convert MP4 files to animated GIFs without uploading data to a server.</p>
+        <h1>✨ Media Buddy</h1>
+        <p>Convert Video, Images, and PDFs entirely in your browser. No server uploads.</p>
 
-        <input type="file" id="video-input" accept="video/mp4">
+        <!-- Changed accept attribute to allow multiple types -->
+        <input type="file" id="file-input" accept=".mp4, .png, .jpg, .jpeg, .heic, .pdf">
         
-        <button id="convert-btn" disabled>Convert to GIF</button>
+        <!-- Dynamic Action Area: Buttons will be injected here based on file type -->
+        <div id="action-area">
+            <p class="placeholder-text">Select a file to see conversion options.</p>
+        </div>
         
-        <div id="status">Initializing...</div>
+        <div id="status">Ready</div>
         
         <div id="output-area">
-            <!-- Converted GIF and download link will appear here -->
+            <!-- Converted files and download links will appear here -->
         </div>
     </div>
 
-    <!-- FIX: Use FFmpeg v0.11.x which is easier to configure for single-threading -->
+    <!-- LIBRARIES -->
+    
+    <!-- FFmpeg for Video -> GIF -->
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
     
-    <!-- Link to our application logic -->
+    <!-- heic2any for HEIC -> PNG -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.3/heic2any.min.js"></script>
+
+    <!-- jsPDF for Image -> PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- PDF.js for PDF -> Image -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Set worker source for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    
+    <!-- Application Logic -->
     <script src="app.js"></script>
 
 </body>
