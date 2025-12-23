@@ -12,28 +12,28 @@ const outputArea = document.getElementById('output-area');
 let ffmpeg = null;
 let currentFile = null;
 
-// --- FFmpeg Initialization (Only needed for Video) ---
+// --- FFmpeg Initialization ---
 const initializeFFmpeg = async () => {
     if (ffmpeg) return; // Already initialized
     try {
-        statusDiv.textContent = 'Initializing Video Engine...';
+        statusDiv.textContent = 'Initializing Advanced Engine...';
         ffmpeg = createFFmpeg({ 
             log: true,
             corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
             mainName: 'main' 
         });
         await ffmpeg.load();
-        statusDiv.textContent = 'Video Engine Ready.';
+        statusDiv.textContent = 'Engine Ready.';
     } catch (error) {
         console.error("FFmpeg Init Error:", error);
-        statusDiv.textContent = 'Video engine failed to load (Images/PDFs still work).';
+        statusDiv.textContent = 'Engine failed to load. Refresh and try again.';
     }
 };
 
 // --- Helper: Status Updates ---
 const setStatus = (msg, type = 'info') => {
     statusDiv.textContent = msg;
-    statusDiv.className = type; // You could add css classes for 'error' or 'success'
+    statusDiv.className = type;
 };
 
 const setLoading = (isLoading, text = 'Processing...') => {
@@ -55,6 +55,14 @@ const addDownloadLink = (url, filename, linkText = 'Download Result') => {
     
     wrapper.appendChild(a);
     outputArea.appendChild(wrapper);
+};
+
+// --- Helper: Display Result ---
+const displayResult = (blob, ext) => {
+    const url = URL.createObjectURL(blob);
+    outputArea.innerHTML += `<img src="${url}" class="preview-img">`;
+    addDownloadLink(url, `converted-${Date.now()}.${ext}`);
+    setLoading(false);
 };
 
 // --- CORE: File Handling ---
@@ -132,41 +140,56 @@ const handleVideoToGif = async () => {
         
         const data = ffmpeg.FS('readFile', outputFile);
         const blob = new Blob([data.buffer], { type: 'image/gif' });
-        const url = URL.createObjectURL(blob);
         
-        outputArea.innerHTML += `<img src="${url}" class="preview-img">`;
-        addDownloadLink(url, `converted-${Date.now()}.gif`);
-        setLoading(false);
+        displayResult(blob, 'gif');
     } catch (e) {
         setLoading(false);
         setStatus(`Error: ${e.message}`, 'error');
     }
 };
 
-// --- HANDLER: HEIC to PNG ---
+// --- HANDLER: HEIC to PNG (Robust with Fallback) ---
 const handleHeicToPng = async () => {
     setLoading(true, 'Converting HEIC to PNG...');
     try {
+        // Attempt 1: Try Standard Lightweight Converter
         const resultBlob = await heic2any({
             blob: currentFile,
             toType: "image/png",
         });
 
-        // heic2any might return an array if multiple images, handle single for now
         const blob = Array.isArray(resultBlob) ? resultBlob[0] : resultBlob;
-        const url = URL.createObjectURL(blob);
-        
-        outputArea.innerHTML += `<img src="${url}" class="preview-img">`;
-        addDownloadLink(url, `converted-${Date.now()}.png`);
-        setLoading(false);
+        displayResult(blob, 'png');
+
     } catch (e) {
-        setLoading(false);
+        console.warn("Standard converter failed. Attempting advanced conversion...", e);
+        setStatus('Standard method failed. Engaging heavy-duty engine (this takes a moment)...');
         
-        // Handle specific HEIC library errors
-        if (e.message && e.message.includes('ERR_LIBHEIF')) {
-            setStatus('Error: Unsupported HEIC format. This usually happens with live photos or highly compressed HEIC files.', 'error');
-        } else {
-            setStatus(`Error: ${e.message}`, 'error');
+        // Attempt 2: Fallback to FFmpeg
+        try {
+            if (!ffmpeg || !ffmpeg.isLoaded()) {
+                await initializeFFmpeg();
+            }
+
+            const inputFile = 'input.heic';
+            const outputFile = 'output.png';
+
+            // Write file to memory
+            ffmpeg.FS('writeFile', inputFile, await fetchFile(currentFile));
+
+            // Convert using FFmpeg
+            await ffmpeg.run('-i', inputFile, outputFile);
+
+            // Read result
+            const data = ffmpeg.FS('readFile', outputFile);
+            const blob = new Blob([data.buffer], { type: 'image/png' });
+
+            displayResult(blob, 'png');
+            
+        } catch (ffmpegError) {
+            console.error(ffmpegError);
+            setLoading(false);
+            setStatus(`Conversion Failed: This HEIC file format is not supported by the browser.`, 'error');
         }
     }
 };
@@ -190,10 +213,7 @@ const handleImageToImage = async (targetMime, extension) => {
         ctx.drawImage(bmp, 0, 0);
         
         canvas.toBlob((blob) => {
-            const url = URL.createObjectURL(blob);
-            outputArea.innerHTML += `<img src="${url}" class="preview-img">`;
-            addDownloadLink(url, `converted-${Date.now()}.${extension}`);
-            setLoading(false);
+            displayResult(blob, extension);
         }, targetMime, 0.9); // 0.9 quality for jpg
         
     } catch (e) {
@@ -207,10 +227,8 @@ const handleImageToPdf = async () => {
     setLoading(true, 'Generating PDF...');
     try {
         const bmp = await createImageBitmap(currentFile);
-        // Default A4 size in mm
         const doc = new jsPDF();
         
-        // Scale image to fit A4 (210 x 297 mm) with margins
         const pageWidth = 210;
         const pageHeight = 297;
         const margin = 10;
@@ -224,13 +242,12 @@ const handleImageToPdf = async () => {
             printWidth = printHeight * imgRatio;
         }
 
-        // We need Data URL for jsPDF
         const canvas = document.createElement('canvas');
         canvas.width = bmp.width;
         canvas.height = bmp.height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(bmp, 0, 0);
-        const imgData = canvas.toDataURL('image/jpeg'); // Utilize JPEG for PDF compression
+        const imgData = canvas.toDataURL('image/jpeg');
 
         doc.addImage(imgData, 'JPEG', margin, margin, printWidth, printHeight);
         const pdfBlob = doc.output('blob');
@@ -252,7 +269,7 @@ const handleImageToPdf = async () => {
 // --- HANDLER: PDF to Images ---
 const handlePdfToImages = async (format = 'png') => {
     setLoading(true, 'Extracting images from PDF...');
-    outputArea.innerHTML = ''; // Clear previous
+    outputArea.innerHTML = ''; 
     
     try {
         const arrayBuffer = await currentFile.arrayBuffer();
@@ -262,7 +279,7 @@ const handlePdfToImages = async (format = 'png') => {
         
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
             const page = await pdf.getPage(pageNum);
-            const viewport = page.getViewport({ scale: 1.5 }); // 1.5x scale for better quality
+            const viewport = page.getViewport({ scale: 1.5 });
             
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
