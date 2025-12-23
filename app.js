@@ -148,49 +148,33 @@ const handleVideoToGif = async () => {
     }
 };
 
-// --- HANDLER: HEIC to PNG (Robust with Fallback) ---
+// --- HANDLER: HEIC to PNG ---
 const handleHeicToPng = async () => {
     setLoading(true, 'Converting HEIC to PNG...');
     try {
-        // Attempt 1: Try Standard Lightweight Converter
+        // FIX: Explicitly enforce the MIME type. 
+        // Browsers sometimes mislabel HEIC files as 'application/octet-stream', causing heic2any to fail.
+        const correctBlob = new Blob([currentFile], { type: 'image/heic' });
+
         const resultBlob = await heic2any({
-            blob: currentFile,
+            blob: correctBlob,
             toType: "image/png",
+            quality: 1 // Max quality
         });
 
+        // heic2any returns an array if the HEIC has multiple images (Live Photo), 
+        // or a single blob if it's a still. We handle both.
         const blob = Array.isArray(resultBlob) ? resultBlob[0] : resultBlob;
+        
         displayResult(blob, 'png');
 
     } catch (e) {
-        console.warn("Standard converter failed. Attempting advanced conversion...", e);
-        setStatus('Standard method failed. Engaging heavy-duty engine (this takes a moment)...');
+        console.error("HEIC Conversion Failed:", e);
+        setLoading(false);
         
-        // Attempt 2: Fallback to FFmpeg
-        try {
-            if (!ffmpeg || !ffmpeg.isLoaded()) {
-                await initializeFFmpeg();
-            }
-
-            const inputFile = 'input.heic';
-            const outputFile = 'output.png';
-
-            // Write file to memory
-            ffmpeg.FS('writeFile', inputFile, await fetchFile(currentFile));
-
-            // Convert using FFmpeg
-            await ffmpeg.run('-i', inputFile, outputFile);
-
-            // Read result
-            const data = ffmpeg.FS('readFile', outputFile);
-            const blob = new Blob([data.buffer], { type: 'image/png' });
-
-            displayResult(blob, 'png');
-            
-        } catch (ffmpegError) {
-            console.error(ffmpegError);
-            setLoading(false);
-            setStatus(`Conversion Failed: This HEIC file format is not supported by the browser.`, 'error');
-        }
+        // Detailed error for the user
+        const msg = e && e.message ? e.message : JSON.stringify(e);
+        setStatus(`Error: Could not decode HEIC. (${msg})`, 'error');
     }
 };
 
